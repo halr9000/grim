@@ -36,17 +36,19 @@
   --mde-h1-tracking: -0.024em;
   --mde-h2-tracking: -0.02em;
   --mde-h3-tracking: -0.01em;
-  --mde-accent: #1d1e22;
-  --mde-link: #296d9a;
-  --mde-marker: #62626a;
-  --mde-bg: #fcfcfb;
-  --mde-bg2: #ececee;
-  --mde-code-bg: #f1f1f2;
+  --mde-accent: var(--ink, #1d1e22);
+  --mde-link: var(--blue, #296d9a);
+  --mde-marker: var(--muted, #62626a);
+  /* Surfaces come from the app's tokens (app.css :root), so dark mode falls out of the shell's [data-theme="dark"]
+     inversion: the block at the bottom re-points only what the note has that the shell doesn't. */
+  --mde-bg: var(--paper, #fcfcfb);
+  --mde-bg2: var(--tint-hover, #ececee);
+  --mde-code-bg: var(--code-bg, #f1f1f2);
   --mde-stroke: #d4d4d8;
   --mde-quote: #d4d4d8;
   --mde-selection: rgba(41, 109, 154, 0.18);
   --mde-highlight: rgba(245, 197, 66, 0.3);
-  --mde-checked: #62626a;
+  --mde-checked: var(--muted, #62626a);
   --mde-gutter: 33px;
   /* Faces come from the app (--font-*); the values after the commas are the defaults. */
   --mde-font: var(--font-text, -apple-system, BlinkMacSystemFont, "Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif);
@@ -499,3 +501,26 @@
 .mde-unsaved details { margin: 8px 0 0; font: 13px/1.4 var(--mde-ui-font); color: var(--mde-text); }
 .mde-unsaved summary { cursor: pointer; }
 .mde-unsaved .mde-fallback-text { margin-top: 8px; max-height: 40vh; overflow: auto; }
+
+/* Dark theme: the shell's [data-theme="dark"] inversion (app.css) already carries the surfaces and the ink
+   tokens through the shell tokens re-pointed above; these are the note's own values, same neutrals inverted.
+   Whole-pixel sizes don't change with the theme. */
+[data-theme="dark"] .mde {
+  --mde-text: #d6d7db; /* 10.9:1 on the dark paper */
+  --mde-heading: #e6e6e9;
+  --mde-text-light: #a7a8b0; /* quotes and tags: 6.0:1 */
+  --mde-stroke: #46474e;
+  --mde-quote: #46474e;
+  --mde-selection: rgba(106, 169, 214, 0.3);
+  --mde-highlight: rgba(245, 197, 66, 0.22);
+}
+/* the few drawn-in colours the tokens don't cover */
+[data-theme="dark"] .mde .chip { color: #71717a; }
+[data-theme="dark"] .mde .chip:hover { color: #a1a1aa; }
+[data-theme="dark"] .mde .ln-table-head .tcell { border-bottom-color: #52535b; }
+
+/* Touch: the note's long-press is the comment gesture — the system's text-selection callout and magnifier stay
+   off the note's surface (the app prevents the hold's context menu itself; desktop selection is untouched). */
+@media (hover: none) and (pointer: coarse) {
+  .mde { -webkit-touch-callout: none; }
+}

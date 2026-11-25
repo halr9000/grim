@@ -43,6 +43,7 @@
 }
 
 :root {
+  color-scheme: light;
   /* Surfaces: paper for the page, neutral (very slightly cool) tints for the sidebar, drawer and hovers. */
   --paper: #fcfcfb;
   --paper-2: #f4f4f5;
@@ -106,6 +107,37 @@
   --label-tracking: 0;
   --head-tracking: 0;
   --modal-head-tracking: 0;
+}
+
+/* Dark: the same neutrals, inverted luminance (DESIGN.md). Only tokens change here — no component colours —
+   so every surface, menu, dialog, toast and hairline flips with them. The toast stays the inverted element
+   (ink fill, paper text): with the tokens flipped that is a light pill with dark text, as before. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #1a1b1e;
+  --paper-2: #222327;
+  --paper-3: #2a2b30;
+  --tint-hover: #2a2b30;
+  --tint-active: #33343a;
+  --code-bg: #232428;
+  --ink: #e6e6e9;
+  --ink-2: #c6c7cc;
+  /* muted and grey-2: small grey text, >= 4.5:1 on paper, the tints and the code background */
+  --muted: #93949d;
+  --grey-2: #93949d;
+  /* grey: borders of controls, >= 3:1 on paper */
+  --grey: #6d6e78;
+  --line: rgba(255, 255, 255, 0.14);
+  --line-soft: rgba(255, 255, 255, 0.08);
+  /* the one hue lightens for dark ground (6.8:1 as link text); mixes keep their alphas */
+  --blue: #6aa9d6;
+  --warn: #e0a800;
+  --warn-soft: rgba(245, 197, 66, 0.18);
+  --red: #e5605a;
+  --red-hover: #eb7d77;
+  /* deeper, slightly stronger shadows on dark ground */
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 2px 8px rgba(0, 0, 0, 0.35), 0 24px 64px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -318,6 +350,18 @@ mark {
 }
 .icon-btn:focus-visible {
   outline-offset: 0;
+}
+
+/* Drawn icons (no icon font): inline SVG strokes at 1.5px, always the ink around them. */
+.ic {
+  display: block;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .quiet-btn {
@@ -1527,7 +1571,10 @@ input[type="radio"] {
   display: none;
 }
 /* the header's "⋯" (History, Authors, Rename, Delete, Copy Link): a 30px ghost button at the right edge */
-.doc-more {
+.doc-more,
+/* the header's other icon actions: view mode (eye ⇄ pencil) and, on touch, the comment button */
+.doc-mode,
+.doc-comment {
   flex: none;
   width: 30px;
   height: 30px;
@@ -1535,12 +1582,16 @@ input[type="radio"] {
   color: var(--ink);
   font-size: 18px;
 }
-.doc-more:hover {
+.doc-more:hover,
+.doc-mode:hover,
+.doc-comment:hover {
   background: var(--paper-2);
   color: var(--ink);
 }
 .doc-more[aria-expanded="true"],
-.doc-more[aria-expanded="true"]:hover {
+.doc-more[aria-expanded="true"]:hover,
+.doc-mode[aria-pressed="true"],
+.doc-mode[aria-pressed="true"]:hover {
   background: var(--tint-active);
 }
 .save-status {
@@ -1588,6 +1639,52 @@ input[type="radio"] {
 }
 .editor-host {
   min-height: 100%;
+}
+/* ---------- inline comments ---------- */
+/* The hovered line's comment button and the small input it opens: fixed overlays over the note (they never shift
+   the text, like the cursors layer), floating surfaces in the pop shadow. */
+.comment-add {
+  position: fixed;
+  z-index: 40;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow-pop);
+  color: var(--muted);
+}
+.comment-add:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.comment-box {
+  position: fixed;
+  z-index: 40;
+  width: min(480px, calc(100vw - 32px));
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-pop);
+}
+.comment-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--grey);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 13.5px/1.2 var(--font-ui);
+}
+.comment-input:focus {
+  border-color: var(--blue);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(41, 109, 154, 0.22);
+}
+.comment-input::placeholder {
+  color: var(--muted);
 }
 /* A note with nothing to show yet: a thin bar along the top, and only once it has taken 300 ms. */
 .note-pending {
@@ -1888,6 +1985,19 @@ input[type="radio"] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* a menu row's drawn glyph (the theme toggle's sun/moon) */
+.menu-ic {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  margin-right: 8px;
+  color: var(--muted);
+}
+.menu-ic .ic {
+  width: 14px;
+  height: 14px;
 }
 .menu-detail {
   flex: none;

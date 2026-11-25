@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-25T00:00:00Z",
+  "title": "Design System: Grim",
+  "extensions": {
+    "colorMeta": {
+      "ink": { "role": "primary", "displayName": "Ink", "canonical": "#1d1e22" },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#fcfcfb" },
+      "blue": { "role": "secondary", "displayName": "Steel Blue", "canonical": "#296d9a" },
+      "muted": { "role": "neutral", "displayName": "Muted Grey", "canonical": "#62626a" },
+      "grey": { "role": "neutral", "displayName": "Border Grey", "canonical": "#8b8b93" },
+      "warn": { "role": "tertiary", "displayName": "Warn Yellow", "canonical": "#e0a800" },
+      "red": { "role": "tertiary", "displayName": "Signal Red", "canonical": "#c62f28" }
+    },
+    "typographyMeta": {
+      "label": { "displayName": "Label", "purpose": "Sidebar section labels, notebook names, table heads." },
+      "body": { "displayName": "Body", "purpose": "All shell UI text at 14px." },
+      "heading": { "displayName": "Heading", "purpose": "Dialog and empty-state headings." },
+      "note-body": { "displayName": "Note Body", "purpose": "The note's own text; mirrored in the Mac app's theme.rs." },
+      "mono": { "displayName": "Mono", "purpose": "Code blocks, inline code, diffs, paths." }
+    },
+    "shadows": [
+      { "name": "pop", "value": "0 1px 2px rgba(24,24,27,0.06), 0 6px 20px rgba(24,24,27,0.1)", "purpose": "Menus, toasts, small floating panels (--shadow-pop)." },
+      { "name": "modal", "value": "0 2px 8px rgba(24,24,27,0.06), 0 24px 64px rgba(24,24,27,0.18)", "purpose": "Dialogs and slide-in drawers (--shadow-modal); backdrop rgba(24,24,27,0.3)." },
+      { "name": "contact", "value": "0 1px 1px rgba(24,24,27,0.04)", "purpose": "Bordered buttons' single-pixel contact shadow." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "0.12s", "purpose": "Hover/tint transitions on buttons, rows, icons." },
+      { "name": "pop-in", "value": "0.1s ease-out", "purpose": "Menus." },
+      { "name": "modal-in", "value": "0.14s ease-out", "purpose": "Dialogs (6px rise + fade)." }
+    ],
+    "breakpoints": [
+      { "name": "history-overlay", "value": "900px" },
+      { "name": "sidebar-overlay", "value": "640px" },
+      { "name": "compact", "value": "520px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The default button: paper fill, hairline border, contact shadow.",
+      "html": "<button class=\"ds-btn\">Cancel</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: 1px solid rgba(24,24,27,0.12); border-radius: 6px; background: #fcfcfb; box-shadow: 0 1px 1px rgba(24,24,27,0.04); color: #1d1e22; cursor: pointer; font: 550 13px/1 -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif; transition: background-color 0.12s, border-color 0.12s; } .ds-btn:hover { background: #f4f4f5; border-color: rgba(24,24,27,0.18); } .ds-btn:active { background: #ebebed; } .ds-btn:focus-visible { outline: 2px solid #296d9a; outline-offset: 2px; }"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ink-inverted primary action.",
+      "html": "<button class=\"ds-btn-primary\">Save</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border: 1px solid #1d1e22; border-radius: 6px; background: #1d1e22; color: #fcfcfb; cursor: pointer; font: 550 13px/1 -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif; transition: background-color 0.12s; } .ds-btn-primary:hover { border-color: #000; background: #000; } .ds-btn-primary:active { background: #3f3f46; } .ds-btn-primary:focus-visible { outline: 2px solid #296d9a; outline-offset: 2px; }"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "icon-button",
+      "description": "24px ghost icon button; muted glyph, tint fill on hover. Icon-only: aria-label mandatory, no visible text.",
+      "html": "<button class=\"ds-icon-btn\" aria-label=\"More actions\" title=\"More\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 15 15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"><circle cx=\"3\" cy=\"7.5\" r=\"0.75\" fill=\"currentColor\"/><circle cx=\"7.5\" cy=\"7.5\" r=\"0.75\" fill=\"currentColor\"/><circle cx=\"12\" cy=\"7.5\" r=\"0.75\" fill=\"currentColor\"/></svg></button>",
+      "css": ".ds-icon-btn { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #62626a; cursor: pointer; } .ds-icon-btn:hover { background: #e4e4e7; color: #1d1e22; } .ds-icon-btn:focus-visible { outline: 2px solid #296d9a; outline-offset: 0; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-text",
+      "description": "34px field, grey border, blue focus ring.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search files\">",
+      "css": ".ds-input { height: 34px; padding: 0 10px; border: 1px solid #8b8b93; border-radius: 6px; background: #fcfcfb; color: #1d1e22; font: 400 14px/1 -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif; outline: none; transition: border-color 0.12s, box-shadow 0.12s; } .ds-input:hover { border-color: #3f3f46; } .ds-input:focus { border-color: #296d9a; } .ds-input:focus-visible { box-shadow: 0 0 0 3px rgba(41,109,154,0.22); } .ds-input::placeholder { color: #62626a; }"
+    },
+    {
+      "name": "Menu Item",
+      "kind": "menu",
+      "refersTo": "menu-item",
+      "description": "30px menu row with tint hover and inset blue focus ring.",
+      "html": "<div class=\"ds-menu\"><button class=\"ds-menu-item\">Rename…</button><button class=\"ds-menu-item ds-danger\">Delete</button></div>",
+      "css": ".ds-menu { min-width: 184px; padding: 4px; border: 1px solid rgba(24,24,27,0.12); border-radius: 8px; background: #fcfcfb; box-shadow: 0 1px 2px rgba(24,24,27,0.06), 0 6px 20px rgba(24,24,27,0.1); } .ds-menu-item { display: flex; align-items: center; width: 100%; height: 30px; padding: 0 10px; border: 0; border-radius: 4px; background: none; color: #1d1e22; cursor: pointer; font: 400 13.5px/1 -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif; text-align: left; white-space: nowrap; } .ds-menu-item:hover { background: #f4f4f5; } .ds-menu-item:focus-visible { outline: none; background: #f4f4f5; box-shadow: inset 0 0 0 2px #296d9a; } .ds-danger { font-weight: 600; }"
+    },
+    {
+      "name": "Tree Row",
+      "kind": "nav",
+      "refersTo": "file-row",
+      "description": "Sidebar note row: 6px rounded, tint hover, active state.",
+      "html": "<div class=\"ds-tree\"><a class=\"ds-row ds-active\">Plan.md</a><a class=\"ds-row\">Notes.md</a></div>",
+      "css": ".ds-tree { background: #f4f4f5; padding: 8px; width: 240px; } .ds-row { display: flex; align-items: center; min-height: 28px; margin: 0; padding: 2px 8px; border-radius: 6px; color: #1d1e22; text-decoration: none; font: 400 14px/1.2 -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif; } .ds-row:hover { background: #ececee; } .ds-row.ds-active { background: #e4e4e7; font-weight: 600; }"
+    },
+    {
+      "name": "Modal",
+      "kind": "custom",
+      "refersTo": "modal",
+      "description": "Native dialog: hairline, 8px radius, modal shadow.",
+      "html": "<div class=\"ds-modal\"><div class=\"ds-modal-head\"><h2>Rename note</h2></div><div class=\"ds-modal-body\"><input class=\"ds-input\" type=\"text\" value=\"Plan.md\"></div></div>",
+      "css": ".ds-modal { width: 440px; border: 1px solid rgba(24,24,27,0.12); border-radius: 8px; background: #fcfcfb; color: #1d1e22; box-shadow: 0 2px 8px rgba(24,24,27,0.06), 0 24px 64px rgba(24,24,27,0.18); } .ds-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 12px 0 20px; } .ds-modal-head h2 { margin: 0; font: 650 16px/1.3 -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif; letter-spacing: -0.01em; } .ds-modal-body { display: flex; flex-direction: column; gap: 14px; padding: 14px 20px 20px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Plain Paper",
+    "overview": "Grim's interface is a sheet of paper with ink on it, in a room with other people writing. No decoration that isn't structure: near-white paper, near-black ink, hairlines instead of fills, one rationed accent. Native-app quality in a browser — whole pixels, platform fonts, no font-smoothing overrides.",
+    "keyCharacteristics": [
+      "Paper and ink; neutral tints; hairlines instead of borders-as-decoration",
+      "Ink is the primary; blue only points (links, focus, selection, presence)",
+      "Whole-pixel layout; platform font first, then Inter",
+      "Depth only for floating surfaces",
+      "No explainer or hint text anywhere"
+    ],
+    "rules": [
+      { "name": "The Ink Accent Rule", "body": "Ink is the primary. Blue never colors a button, badge, or field; it points (link, focus, selection, presence) and nothing else.", "section": "colors" },
+      { "name": "The One Red Rule", "body": "Red appears exactly once: the Delete-account button. Every other destructive action is a weight-600 ink item.", "section": "colors" },
+      { "name": "The Hairline Rule", "body": "Structure is drawn with 1px lines, not background fills. Tint fills are state (hover, active, selection), never permanent layout.", "section": "colors" },
+      { "name": "The Sentence Case Rule", "body": "No text-transform: uppercase anywhere; labels earn hierarchy with weight and size.", "section": "typography" },
+      { "name": "The Whole-Pixel Rule", "body": "Every note size, line height and padding is a whole pixel so web and Mac put each line in the same place.", "section": "typography" },
+      { "name": "The Floating Rule", "body": "Shadows only on elements that float above the page (menu, modal, toast, drawer) plus a contact hair under bordered buttons.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do route every new color through a token in app.css and the .mde block",
+      "Do keep text ≥ 4.5:1 and borders ≥ 3:1 against their actual surface",
+      "Do make hover-revealed controls always visible on hover: none devices",
+      "Do draw icons with currentColor SVG/CSS at 1.5px stroke and give icon-only buttons aria-labels",
+      "Do check any note-token change against docs/typography.md and the Mac app's theme.rs"
+    ],
+    "donts": [
+      "Don't put explainer, hint, or caption text in the UI — ever",
+      "Don't add a second red surface or color destructive menu items red",
+      "Don't use blue as decoration, background field, or button fill",
+      "Don't uppercase labels or introduce a second UI typeface",
+      "Don't add shadows to resting, non-floating elements",
+      "Don't invent spacing outside the 4/6/8/12/16/20 rhythm or a new radius step"
+    ]
+  }
+}

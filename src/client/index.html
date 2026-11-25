@@ -37,9 +37,22 @@
     <link rel="preload" href="/api/server" as="fetch" crossorigin />
     <link rel="preload" href="/api/me" as="fetch" crossorigin />
     <!--boot-preload-->
+    <script>
+      // The theme before first paint: the saved choice, else the system's (the app's styles follow [data-theme];
+      // "/" is the landing page, which keeps its own light art direction).
+      (function () {
+        try {
+          var t = localStorage.getItem("grimoire.theme");
+          if (t !== "dark" && t !== "light") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          if (t === "dark" && location.pathname !== "/") document.documentElement.dataset.theme = "dark";
+        } catch (e) {}
+      })();
+    </script>
     <style>
       html, body { margin: 0; height: 100%; background: #fcfcfb; }
+      html[data-theme="dark"], html[data-theme="dark"] body { background: #1a1b1e; }
       #splash { position: fixed; inset: 0; z-index: 2147483646; display: grid; place-items: center; background: #fcfcfb; }
+      html[data-theme="dark"] #splash { background: #1a1b1e; }
       #splash span { font: 600 11px/1 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, Arial, sans-serif; letter-spacing: 0.32em; padding-left: 0.32em; color: #a3a3aa; opacity: 0; animation: splash-in 0.4s ease-out 0.15s forwards; }
       @keyframes splash-in { to { opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { #splash span { animation-duration: 0s; } }

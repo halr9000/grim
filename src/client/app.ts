@@ -7,6 +7,9 @@ import { RustCollab, type ClosedReason, type CollabEvents } from "./editor-rs/co
 import { COULDNT_START, NOT_KEPT, STOPPED, showFallback, unsavedActions, unsavedBanner } from "./editor-rs/fallback.ts";
 import { forgetAllUnsent, forgetUnsent, keepUnsent, keptUnsent, type KeptEdits } from "./editor-rs/unsent.ts";
 import { forgetImageSizes } from "./editor-rs/render.ts";
+import { lineIndexOf } from "./editor-rs/blocks.ts";
+import { lineAt } from "./editor-rs/offsets.ts";
+import type { RustEditorView } from "./editor-rs/view.ts";
 import { api, ApiError, rawUrl, setGuest, type AppEvent, type Me, type PresenceUserInfo, type Workspace, type ServerInfo, type Tree, type WorkspaceItem } from "./api.ts";
 import { anonIdentity, setAnonName, signInDialog, signInDirect, type AnonIdentity, type SignInReason } from "./signin.ts";
 import { renderScratch } from "./scratch.ts";
@@ -200,6 +203,10 @@ const saveStatusEl = h("div", { class: "save-status", "aria-live": "polite" });
 const SHOW_AUTHORS_KEY = "grimoire.showAuthors";
 /** The header's "⋯": History, Authors, the open note's Rename / Delete and Copy Link. */
 const moreBtn = h("button", { type: "button", class: "icon-btn doc-more", title: "More", "aria-label": "More actions", "aria-haspopup": "menu", "aria-expanded": "false", hidden: true }, "⋯");
+/** The header's view-mode toggle (eye ⇄ pencil): read the note with no text cursor; editing takes switching back. */
+const viewBtn = h("button", { type: "button", class: "icon-btn doc-mode", "aria-pressed": "false", hidden: true, onclick: () => session?.setViewMode(!session.viewMode) });
+/** Touch has no hover: a long-press on a line is the primary comment path; the header's button (it comments the caret's line) is the one for when both hands are busy. */
+const commentHeadBtn = h("button", { type: "button", class: "icon-btn doc-comment", hidden: true, onclick: () => session?.insertCommentHere() });
 const docBody = h("div", { class: "doc-body" });
 const history = new HistoryPanel((open) => app.classList.toggle("history-open", open));
 const switcherBtn = h("button", { type: "button", class: "ws-switcher", "aria-haspopup": "menu", "aria-expanded": "false" });
@@ -300,6 +307,7 @@ async function boot() {
 
 function renderShell() {
   app.className = "app";
+  applyTheme();
   switcherBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     if (menuEl && menuOpener === switcherBtn) return closeMenu();
@@ -364,7 +372,7 @@ function renderShell() {
     h("main", { class: "main" },
       h("header", { class: "doc-header" },
         h("button", { type: "button", class: "icon-btn sidebar-toggle", "aria-label": "Sidebar", "aria-expanded": "false", "aria-controls": "sidebar", onclick: () => setSidebarOpen(!app.classList.contains("sidebar-open")) }, h("span", { class: "burger", "aria-hidden": "true" })),
-        breadcrumbEl, sourceEl, h("div", { class: "spacer" }), saveStatusEl, participantsEl, moreBtn,
+        breadcrumbEl, sourceEl, h("div", { class: "spacer" }), saveStatusEl, participantsEl, commentHeadBtn, viewBtn, moreBtn,
       ),
       docBody,
     ),
@@ -533,12 +541,19 @@ function renderAccount() {
   accountBtn.setAttribute("aria-label", `Signed in as ${me.name}. Account`);
 }
 
-/** The account row's menu, opening upward: my email, Change name…, Sign out. */
+/** This device is a touch device (no hover, coarse pointer): view mode's default and the touch comment path. */
+const TOUCH = matchMedia("(hover: none) and (pointer: coarse)");
+
+/** The account menu's theme row: the drawn sun/moon with the row's own word (nothing else explains it). */
+const themeItem = (): MenuAction => ({ label: theme() === "dark" ? "Light mode" : "Dark mode", icon: theme() === "dark" ? icon(...SUN) : icon(...MOON), run: toggleTheme });
+
+/** The account row's menu, opening upward: my email, Change name…, the theme, Sign out. */
 function openAccountMenu() {
-  if (noSignIn) return showMenu(accountBtn, [{ section: `${location.host} · No sign-in` }, { label: "Change name…", run: changeName }], { keepOrder: true, above: true, className: "account-menu" });
+  if (noSignIn) return showMenu(accountBtn, [{ section: `${location.host} · No sign-in` }, { label: "Change name…", run: changeName }, themeItem()], { keepOrder: true, above: true, className: "account-menu" });
   showMenu(accountBtn, [
     myEmail() ? { section: myEmail() } : null,
     { label: "Change name…", run: changeName },
+    themeItem(),
     { label: "Sign out", run: logout },
     "sep",
     { label: "Delete account…", danger: true, run: deleteAccount },
@@ -1708,7 +1723,7 @@ async function deleteFile(repo: Workspace, path: string): Promise<boolean> {
 
 // ---------- menu ----------
 
-type MenuAction = { label: string; run: () => void; danger?: boolean; detail?: string; checked?: boolean; disabled?: boolean; /** A × at the right of the row (its label is the aria-label). */ remove?: { label: string; run: () => void } };
+type MenuAction = { label: string; run: () => void; danger?: boolean; detail?: string; checked?: boolean; disabled?: boolean; /** A drawn glyph before the label (the theme toggle's sun/moon). */ icon?: SVGSVGElement; /** A × at the right of the row (its label is the aria-label). */ remove?: { label: string; run: () => void } };
 type MenuItem = MenuAction | { section: string } | "sep" | null;
 const isAction = (i: MenuItem): i is MenuAction => !!i && typeof i === "object" && "run" in i;
 
@@ -1747,6 +1762,7 @@ function showMenu(at: HTMLElement | { x: number; y: number }, items: MenuItem[],
       "aria-checked": i.checked !== undefined ? String(!!i.checked) : undefined, disabled: i.disabled,
       onclick: (e: MouseEvent) => (e.stopPropagation(), closeMenu(false), i.run()),
     },
+      i.icon ? h("span", { class: "menu-ic", "aria-hidden": "true" }, i.icon) : null,
       i.checked !== undefined ? h("span", { class: `menu-check${i.checked ? " on" : ""}`, "aria-hidden": "true" }) : null,
       h("span", { class: "menu-label" }, i.label),
       i.detail ? h("span", { class: "menu-detail" }, i.detail) : null,
@@ -1832,6 +1848,203 @@ function closeMenu(restoreFocus = true) {
   menuOpener = null;
   menuOpenerKey = null;
 }
+
+// ---------- theme (dark mode) ----------
+
+/** An inline SVG glyph (1.5px stroke, currentColor): the icon-only buttons' and the menu rows' icon. */
+function icon(...paths: string[]): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.classList.add("ic");
+  for (const d of paths) {
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", d);
+    svg.appendChild(p);
+  }
+  return svg;
+}
+
+const EYE = ["M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z", "M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0"];
+const PENCIL = ["M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"];
+const BUBBLE = ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"];
+const SUN = ["M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0", "M12 2v2", "M12 20v2", "M4.9 4.9l1.4 1.4", "M17.7 17.7l1.4 1.4", "M2 12h2", "M20 12h2", "M4.9 19.1l1.4-1.4", "M17.7 6.3l1.4-1.4"];
+const MOON = ["M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"];
+
+/** The app's colour theme, remembered in this browser (the pre-paint snippet in index.html applies it first). */
+const THEME_KEY = "grimoire.theme";
+
+function theme(): "light" | "dark" {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function setTheme(next: "light" | "dark") {
+  document.documentElement.dataset.theme = next;
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {}
+}
+
+function toggleTheme() {
+  setTheme(theme() === "dark" ? "light" : "dark");
+}
+
+/** The shell's theme (the landing page keeps its own light art direction; it's the only page that isn't the app). */
+function applyTheme() {
+  if (location.pathname === "/") return;
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(THEME_KEY);
+  } catch {}
+  document.documentElement.dataset.theme = saved === "dark" || saved === "light" ? saved : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+// ---------- inline comments (a blockquote line tagged #comment) ----------
+
+/**
+ * The hovered line's comment button and the little input it opens: fixed overlays over the note (they never shift
+ * the text, like the cursors layer), floating surfaces in the pop shadow. Touch has no hover: a long-press on a
+ * line opens the input at that line (read mode switches to edit first), and the header's button comments the
+ * caret's line.
+ */
+const commentBtn = h("button", { type: "button", class: "icon-btn comment-add", title: "Comment", "aria-label": "Add a comment", hidden: true, onclick: openCommentInput }, icon(...BUBBLE));
+const commentField = h("input", { class: "comment-input", type: "text", "aria-label": "Comment", placeholder: "Comment", spellcheck: "false" }) as HTMLInputElement;
+const commentBox = h("div", { class: "comment-box", hidden: true }, commentField);
+/** The hovered line's insert point (the raw offset after it) and its box, while the affordance is up. */
+let commentAt: number | null = null;
+let commentRect: { left: number; top: number; bottom: number } | null = null;
+document.body.append(commentBtn, commentBox);
+
+function hideCommentUI() {
+  commentAt = null;
+  commentRect = null;
+  commentBtn.hidden = true;
+  commentBox.hidden = true;
+}
+
+function openCommentInput() {
+  if (commentAt === null || !commentRect) return hideCommentUI();
+  commentBtn.hidden = true;
+  commentBox.hidden = false;
+  commentBox.style.left = `${commentRect.left}px`;
+  commentBox.style.top = `${commentRect.bottom + 4}px`;
+  commentField.value = "";
+  commentField.focus();
+}
+
+// (mouse only: the hover affordance is an editing affordance, and read mode has none)
+docBody.addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "mouse") return;
+  const s = session;
+  const view = s && !s.viewMode && !s.readOnly ? s.view : null;
+  const ln = e.target instanceof Element ? e.target.closest(".ln") : null;
+  if (!view || view.destroyed || !ln || !view.root.contains(ln)) return hideCommentUI();
+  const span = view.doc.lines[lineIndexOf(view.root, ln)];
+  if (!span) return hideCommentUI();
+  const r = ln.getBoundingClientRect();
+  commentAt = span.to < view.doc.text.length ? span.to + 1 : span.to;
+  commentRect = { left: r.left, top: r.top, bottom: r.bottom };
+  commentBtn.hidden = false;
+  commentBtn.style.left = `${Math.max(8, r.right - 28)}px`;
+  commentBtn.style.top = `${r.top + r.height / 2 - 12}px`;
+});
+docBody.addEventListener("pointerleave", hideCommentUI);
+// a scroll moves the lines out from under the affordance: it goes (the mouse's next move brings it back)
+docBody.addEventListener("scroll", hideCommentUI, { passive: true });
+
+commentField.addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const at = commentAt;
+    const text = commentField.value;
+    hideCommentUI();
+    if (at !== null) session?.insertComment(at, text);
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    hideCommentUI();
+  }
+});
+// leaving the input (a click elsewhere) cancels: an empty box was never a comment
+commentField.addEventListener("blur", () => {
+  if (!commentBox.hidden) hideCommentUI();
+});
+
+// ---------- the touch long-press (the primary mobile comment path) ----------
+
+/**
+ * A ~500 ms hold on a line opens the comment input at that line — an intentional act, like the desktop hover's
+ * click, so it works in read mode too (the hold switches to edit at that line). Everything that isn't a hold
+ * cancels it: a scroll (more than a few px of drift before the timer), a second finger (pinch), or lifting early.
+ * The hold's system menu (text callout, link sheet) is kept off the note: no context menu while a finger is down,
+ * and no selection callout on the note's surface (editor.css, touch only).
+ */
+const LONG_PRESS_MS = 500;
+/** Finger drift (px) tolerated before the hold is a scroll, not a long-press. */
+const LONG_PRESS_SLOP = 10;
+let pressTimer = 0;
+let pressPt: { x: number; y: number } | null = null;
+let pressLine: Element | null = null;
+/** The touch pointers currently on the note (a second one is a pinch, never a hold). */
+const touchIds = new Set<number>();
+
+function cancelLongPress() {
+  if (pressTimer) window.clearTimeout(pressTimer);
+  pressTimer = 0;
+  pressPt = null;
+  pressLine = null;
+}
+
+docBody.addEventListener("pointerdown", (e) => {
+  if (e.pointerType !== "touch") return;
+  touchIds.add(e.pointerId);
+  if (touchIds.size > 1) return cancelLongPress();
+  const ln = e.target instanceof Element ? e.target.closest(".ln") : null;
+  const s = session;
+  const view = s && !s.readOnly && !s.failed ? s.view : null;
+  if (!view || view.destroyed || !ln || !view.root.contains(ln)) return cancelLongPress();
+  pressLine = ln;
+  pressPt = { x: e.clientX, y: e.clientY };
+  if (!pressTimer) pressTimer = window.setTimeout(() => {
+    pressTimer = 0;
+    const ln = pressLine;
+    cancelLongPress();
+    const s = session;
+    const view = s && !s.readOnly ? s.view : null;
+    if (!s || !view || view.destroyed || !ln || !view.root.contains(ln)) return;
+    void s.commentLine(lineIndexOf(view.root, ln));
+    // the lift over the note mustn't take focus back from the comment input (its click would)
+    swallowNoteClickUntil = performance.now() + 400;
+  }, LONG_PRESS_MS);
+});
+docBody.addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "touch" || !pressTimer || !pressPt) return;
+  if (Math.abs(e.clientX - pressPt.x) > LONG_PRESS_SLOP || Math.abs(e.clientY - pressPt.y) > LONG_PRESS_SLOP) cancelLongPress();
+});
+// up, lifted-out or taken by a scroll: the hold is over
+docBody.addEventListener("pointerup", (e) => {
+  touchIds.delete(e.pointerId);
+  cancelLongPress();
+});
+docBody.addEventListener("pointercancel", (e) => {
+  touchIds.delete(e.pointerId);
+  cancelLongPress();
+});
+// the long-press's system menu would cover the input (and a long-press on a note is ours, not the system's)
+docBody.addEventListener("contextmenu", (e) => {
+  if (touchIds.size > 0) e.preventDefault();
+});
+// the hold's release (and its click, if the browser makes one) lands on the note: it must not steal focus back
+let swallowNoteClickUntil = 0;
+docBody.addEventListener(
+  "click",
+  (e) => {
+    if (performance.now() < swallowNoteClickUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  },
+  true,
+);
 
 // ---------- routing ----------
 
@@ -2300,9 +2513,26 @@ function showEmpty() {
   ));
 }
 
+/** The header's view-mode and (touch) comment buttons: what the open note allows right now. */
+function updateModeButtons(repo: Workspace | null | undefined) {
+  const s = session;
+  const editable = !!s && !!repo && !repo.readOnly && !s.failed;
+  viewBtn.hidden = !editable;
+  commentHeadBtn.hidden = !(s && editable && !s.viewMode && !s.readOnly && TOUCH.matches);
+  const view = !!s?.viewMode;
+  clear(viewBtn, view ? icon(...PENCIL) : icon(...EYE));
+  viewBtn.title = view ? "Edit" : "Read";
+  viewBtn.setAttribute("aria-label", view ? "Edit" : "Read");
+  viewBtn.setAttribute("aria-pressed", String(view));
+  clear(commentHeadBtn, icon(...BUBBLE));
+  commentHeadBtn.title = "Comment";
+  commentHeadBtn.setAttribute("aria-label", "Add a comment");
+}
+
 function renderHeader() {
   moreBtn.hidden = !session;
   if (!session && history.open) history.close();
+  updateModeButtons(current ? repoById(current.repo) : undefined);
   if (!current) {
     clear(breadcrumbEl);
     clear(sourceEl);
@@ -2428,6 +2658,11 @@ function demoBanner(repo: string) {
   return isDemoRoom(repo) ? h("div", { class: "demo-banner", role: "note" }, `Demo workspace — anyone can edit; your copy resets ${demoResetPhrase(demoResetMinutes ?? server?.demoResetMinutes)}.`) : null;
 }
 
+/** Read mode by default on touch (no hover, coarse pointer, no keyboard wanted while reading); edit mode on desktops. */
+function defaultViewMode(): boolean {
+  return TOUCH.matches;
+}
+
 class Session {
   /** The connection (the engine owns the note's shared document); null while the wasm loads, or if it can't. */
   provider: RustCollab | null = null;
@@ -2441,6 +2676,14 @@ class Session {
   private kept: KeptEdits | null = null;
   everConnected = false;
   ended = false;
+  /**
+   * Read mode: the note renders with no text cursor and nothing editable (the `.mde.readonly` state); editing and
+   * commenting take switching back (the header's toggle). The default follows the device: read on touch, edit on
+   * fine pointers — a device default, not a per-note setting.
+   */
+  viewMode = defaultViewMode();
+  /** The mounted editor's view (the comment affordance and inserts; null before it's up, gone once replaced). */
+  view: RustEditorView | null = null;
   private readonly opened = performance.now();
   /** The editor couldn't start or crashed: the note is shown read-only. */
   failed = false;
@@ -2679,6 +2922,67 @@ class Session {
     return this.provider?.readOnly ?? false;
   }
 
+  /** Switch between read mode and edit mode (the header's toggle): the editor remounts read-only or editable. */
+  setViewMode(view: boolean) {
+    if (this.ended || this.viewMode === view) return;
+    this.viewMode = view;
+    hideCommentUI();
+    this.mount();
+    updateModeButtons(repoById(this.repo));
+  }
+
+  /**
+   * A comment: an ordinary edit through the engine — a blockquote line tagged with the `#comment` tag
+   * (`> #comment …`) inserted after the line at raw offset `at` (the start of the next line, or the note's end),
+   * with the caret left inside it. False if the note isn't editable right now (read mode never comments).
+   */
+  insertComment(at: number, text: string | null): boolean {
+    const view = this.view;
+    if (!view || view.destroyed || this.readOnly || this.viewMode) return false;
+    const t = (text ?? "").trim();
+    const doc = view.doc.text;
+    // the note's last line has no trailing newline; the comment line brings its own
+    const str = at === 0 ? (t ? `> #comment ${t}\n` : `> #comment `) : at >= doc.length ? `\n> #comment${t ? ` ${t}` : " "}` : `> #comment${t ? ` ${t}` : " "}\n`;
+    view.insertAt(at, at, str);
+    return true;
+  }
+
+  /** The touch path: an empty `> #comment ` line after the line the caret is on; the caret lands in it. */
+  insertCommentHere(): boolean {
+    const view = this.view;
+    if (!view || view.destroyed) return false;
+    const sel = this.editor?.selection();
+    const head = sel ? Math.min(sel.head, view.doc.text.length) : view.doc.text.length;
+    const li = lineAt(view.doc.lines, head);
+    const span = view.doc.lines[li];
+    return this.insertComment(span ? (span.to < view.doc.text.length ? span.to + 1 : span.to) : 0, null);
+  }
+
+  /**
+   * The touch long-press's path: open the comment input at line `li` of the live view — switching out of read mode
+   * first (the hold is as intentional as the header toggle, so it may bring the keyboard), keeping the scroll so
+   * the pressed line stays put. False if the note can't be edited or the line is gone once the editable view is up.
+   */
+  async commentLine(li: number): Promise<boolean> {
+    if (this.ended || this.readOnly) return false;
+    let view = this.view;
+    if (this.viewMode) {
+      const scroll = docBody.scrollTop;
+      this.setViewMode(false);
+      view = (await this.editor?.ready) ?? null;
+      docBody.scrollTop = scroll;
+    }
+    if (!view || view.destroyed) return false;
+    const span = view.doc.lines[li];
+    const el = view.root.getElementsByClassName("ln")[li];
+    if (!span || !(el instanceof Element)) return false;
+    commentAt = span.to < view.doc.text.length ? span.to + 1 : span.to;
+    const r = el.getBoundingClientRect();
+    commentRect = { left: r.left, top: r.top, bottom: r.bottom };
+    openCommentInput();
+    return true;
+  }
+
   /** The note's text on screen, live or the read-only preview. */
   shownText(): string | null {
     return this.editor?.text() ?? this.previewText;
@@ -2709,7 +3013,7 @@ class Session {
   /** Type `keys` (text, "\n" for Enter, "\b" for Backspace) into the editor through its own input handling. */
   private async typeInto(editor: EditorHandle, keys: string[]) {
     const view = await editor.ready;
-    if (!keys.length || !view || this.editor !== editor || this.readOnly) return;
+    if (!keys.length || !view || this.editor !== editor || this.readOnly || this.viewMode) return;
     const text = keys.join("");
     for (const m of text.matchAll(/\n|\x08|[^\n\x08]+/g)) {
       const k = m[0];
@@ -2733,7 +3037,8 @@ class Session {
 
   private mount() {
     if (this.ended) return;
-    const focus = !this.editor && (mayFocusEditor() || focusNextEditor || !!this.carry?.focused);
+    // (read mode: nothing here may summon the keyboard or a caret — focusing waits for edit mode)
+    const focus = !this.editor && !this.viewMode && (mayFocusEditor() || focusNextEditor || !!this.carry?.focused);
     focusNextEditor = false;
     this.editor?.destroy();
     this.editor = null;
@@ -2754,7 +3059,12 @@ class Session {
       upload: async (file: File) => (await api.uploadImage(this.repo, this.path, file)).markdown,
       notice: (m: string, kind?: "info" | "error") => toast(m, kind),
     };
-    this.editor = mountEditor(this.host, { collab: this.provider!, readOnly: this.readOnly, images, onLink: (t) => openLink(this, t), upload, onEnter: () => this.autoName() });
+    const handle = mountEditor(this.host, { collab: this.provider!, readOnly: this.readOnly || this.viewMode, images, onLink: (t) => openLink(this, t), upload, onEnter: () => this.autoName() });
+    this.editor = handle;
+    // the view arrives at once with a collab engine; kept while it's this session's editor (for the comment affordance)
+    void handle.ready.then((v) => {
+      if (this.editor === handle) this.view = v;
+    });
     if (focus) this.editor.focus();
     if (focus && typedAhead?.path === this.path && performance.now() <= typedAhead.until) void this.replayTypedAhead(this.editor);
     const carry = this.carry;
@@ -2910,6 +3220,7 @@ class Session {
     this.previewEditor = null;
     this.editor?.destroy();
     this.editor = null;
+    this.view = null;
     this.fallback?.();
     const p = this.provider;
     this.provider = null;
